@@ -1,0 +1,213 @@
+Public TheString As String, TheDate As Date
+Dim SourceWB As Workbook, TargetWB As Workbook
+Dim SourceSht As Worksheet, TargetSht As Worksheet, ws As Worksheet
+Dim BackInt As Integer, FrontInt As Integer, WeekStart As Date, WeekEnd As Date
+Dim WeekStartValue As Integer, WeekEndValue As Integer
+Dim tmpCell As Range, DateVal As Integer, evmRow As Integer, StartPoint As Integer
+Dim Valid As Boolean
+Dim SumOfEV As Double, SumOfAC As Double, SumOfHrs As Double, TotalFTE As Integer, SumOfPV As Double
+Dim exists As Boolean
+Dim ActualFinishDate As Variant, ActualFinishValue As Variant, loading As Double
+Dim ActualEnd As Variant
+Dim TotalPlannedDays As Integer, DaysInThatWeek As Integer, StartInThatWeek As Date, EndInThatWeek As Date, HrstoSpent As Double
+
+
+
+Sub EVM()
+    Set SourceWB = Application.Workbooks("DevTeam_Schedule_macro.xlsm")
+    For Each ws In SourceWB.Worksheets
+        If ws.name = "EVM" Or ws.name = "Sheet1" Then
+           Application.DisplayAlerts = False
+            ws.Delete
+            Application.DisplayAlerts = True
+        End If
+    Next
+    Workbooks.Open Filename:="P:\trent_xwb\xwb_as\Users\RRB_ControlSW\02_Project_Management\01_Design\Schedule\DevTeam_Schedule.xlsm"
+    Sheets("Sheet1").Select
+    Sheets("Sheet1").Copy Before:=SourceWB.Sheets(1)
+    Workbooks("DevTeam_Schedule.xlsm").Close SaveChanges:=False
+    Set SourceSht = SourceWB.Worksheets("Sheet1")
+    SourceWB.Worksheets.Add(, SourceWB.Worksheets(SourceWB.Worksheets.Count)).name = "EVM"
+    Set TargetSht = SourceWB.Worksheets("EVM")
+    Call ShowForm
+    Call DatetoNum
+    Call FilterRows
+    Call SumOf
+    Call CalculateOtherValues
+End Sub
+Sub ShowForm()
+    DatePicker.Show
+End Sub
+
+
+Sub DatetoNum()
+    WeekStart = TheDate
+    Do While Weekday(WeekStart) > 2
+    
+      WeekStart = WeekStart - 1
+    Loop
+    WeekEnd = WeekStart + 4
+    
+End Sub
+
+Sub FilterRows()
+    evmRow = 2
+    TargetSht.Cells(1, 1).Value = "Activity"
+    TargetSht.Cells(1, 2).Value = "Developer"
+    TargetSht.Cells(1, 3).Value = "Plan Start Date"
+    TargetSht.Cells(1, 4).Value = "Plan Finish Date"
+    TargetSht.Cells(1, 5).Value = "Percent Complete"
+    TargetSht.Cells(1, 6).Value = "PV (Planned Value, Total Budget)"
+    TargetSht.Cells(1, 7).Value = "Hours to be Spent"
+    TargetSht.Cells(1, 8).Value = "AC (Actual Cost)"
+    TargetSht.Cells(1, 9).Value = "EV (Actual Work Produced)"
+    TargetSht.Cells(1, 11).Value = "SV"
+    TargetSht.Cells(1, 12).Value = "CV"
+    TargetSht.Cells(1, 13).Value = "CPI"
+    TargetSht.Cells(1, 14).Value = "SPI"
+    For Each tmpCell In TargetSht.Range("A1:I1")
+        tmpCell.Font.ColorIndex = 56
+        tmpCell.Font.Bold = True
+        tmpCell.Font.Size = 12
+        tmpCell.Font.name = "Cambria"
+        tmpCell.Interior.ColorIndex = 33
+        tmpCell.WrapText = True
+    Next
+    
+    For Each tmpCell In TargetSht.Range("K1:N1")
+        tmpCell.Font.ColorIndex = 30
+        tmpCell.Font.Bold = True
+        tmpCell.Font.Size = 12
+        tmpCell.Font.name = "Cambria"
+        tmpCell.Interior.ColorIndex = 33
+        tmpCell.WrapText = False
+    Next
+    
+    For Each tmpCell In SourceSht.Range("G9:G165")
+    ActualFinsihDate = SourceSht.Cells(tmpCell.Row, tmpCell.Column + 3).Text
+    ActualFinishValue = SourceSht.Cells(tmpCell.Row, tmpCell.Column + 3).Value
+     If (tmpCell.Text <> "" And tmpCell.Text <> "#N/A" And ActualFinsihDate <> "" And ActualFinsihDate <> "#N/A" And SourceSht.Cells(tmpCell.Row, 5).Text <> "") Then
+        Valid = Not ((tmpCell.Value < WeekStart And ActualFinishValue < WeekStart) Or (tmpCell.Value > WeekEnd And ActualFinishValue > WeekEnd))
+        If (Valid) Then
+        TargetSht.Cells(evmRow, 1).Value = SourceSht.Cells(tmpCell.Row, 3).Value
+        TargetSht.Cells(evmRow, 2).Value = SourceSht.Cells(tmpCell.Row, 5).Value
+        TargetSht.Cells(evmRow, 3).Value = SourceSht.Cells(tmpCell.Row, 7).Value
+        TargetSht.Cells(evmRow, 4).Value = SourceSht.Cells(tmpCell.Row, 10).Value
+        TargetSht.Cells(evmRow, 5).Value = FormatPercent(SourceSht.Cells(tmpCell.Row, 16).Value)
+        TargetSht.Cells(evmRow, 6).Value = SourceSht.Cells(tmpCell.Row, 17).Value
+        Call HoursTobeSpent
+        TargetSht.Cells(evmRow, 7).Value = HrstoSpent
+        TargetSht.Cells(evmRow, 8).Value = SourceSht.Cells(tmpCell.Row, 19).Value
+        TargetSht.Cells(evmRow, 9).Value = SourceSht.Cells(tmpCell.Row, 17).Value * SourceSht.Cells(tmpCell.Row, 16).Value
+        TargetSht.Cells(evmRow, 11).Value = TargetSht.Cells(evmRow, 9).Value - TargetSht.Cells(evmRow, 6).Value
+        TargetSht.Cells(evmRow, 12).Value = TargetSht.Cells(evmRow, 9).Value - TargetSht.Cells(evmRow, 8).Value
+        If TargetSht.Cells(evmRow, 8).Value <> 0 Then
+            TargetSht.Cells(evmRow, 13).Value = TargetSht.Cells(evmRow, 9).Value / TargetSht.Cells(evmRow, 8).Value
+        Else
+            TargetSht.Cells(evmRow, 13).Value = 10
+        End If
+        If TargetSht.Cells(evmRow, 6).Value <> 0 Then
+            TargetSht.Cells(evmRow, 14).Value = TargetSht.Cells(evmRow, 9).Value / TargetSht.Cells(evmRow, 6).Value
+        Else
+            TargetSht.Cells(evmRow, 14).Value = 0
+        End If
+        evmRow = evmRow + 1
+        End If
+     End If
+    Next
+    Set tmpCell = Range("A1:I" & evmRow - 1)
+    With tmpCell.Borders
+        .LineStyle = xlContinuous
+        .Color = vbBlack
+        .Weight = xlThin
+    End With
+    Set tmpCell = Range("K1:N" & evmRow - 1)
+    With tmpCell.Borders
+        .LineStyle = xlContinuous
+        .Color = vbBlack
+        .Weight = xlThin
+    End With
+    
+    TargetSht.Range("C2:D" & evmRow - 1).NumberFormat = "dd/mm/yyyy"
+End Sub
+
+Sub SumOf()
+Set dict = CreateObject("Scripting.Dictionary")
+    For Each tmpCell In TargetSht.Range("B2:B" & evmRow - 1)
+        If Not dict.exists(tmpCell.Value) Then
+            dict.Add tmpCell.Value, 0
+        End If
+    Next
+    CountUnique = dict.Count
+    TotalFTE = CountUnique * 8 * 5
+    SumOfPV = WorksheetFunction.Sum(TargetSht.Range("F2:F" & evmRow - 1))
+    SumOfEV = WorksheetFunction.Sum(TargetSht.Range("I2:I" & evmRow - 1))
+    SumOfAC = WorksheetFunction.Sum(TargetSht.Range("H2:H" & evmRow - 1))
+    SumOfHrs = WorksheetFunction.Sum(TargetSht.Range("G2:G" & evmRow - 1))
+    TargetSht.Cells(evmRow, 6).Value = SumOfPV
+    TargetSht.Cells(evmRow, 6).Font.Bold = True
+    TargetSht.Cells(evmRow, 7).Value = SumOfHrs
+    TargetSht.Cells(evmRow, 7).Font.Bold = True
+    TargetSht.Cells(evmRow, 8).Value = SumOfAC
+    TargetSht.Cells(evmRow, 8).Font.Bold = True
+    TargetSht.Cells(evmRow, 9).Value = SumOfEV
+    TargetSht.Cells(evmRow, 9).Font.Bold = True
+    
+End Sub
+Sub CalculateOtherValues()
+    With TargetSht.Columns("B")
+        .ColumnWidth = 50
+    End With
+    TargetSht.Cells(evmRow + 3, 2).Value = "Total FTE Utilization"
+    TargetSht.Cells(evmRow + 3, 3).Value = TotalFTE
+    TargetSht.Cells(evmRow + 4, 2).Value = "Planned Work for the week (PV)"
+    TargetSht.Cells(evmRow + 4, 3).Value = SumOfHrs
+    TargetSht.Cells(evmRow + 5, 2).Value = "Actual Work Completed for the week"
+    TargetSht.Cells(evmRow + 5, 3).Value = SumOfEV
+    TargetSht.Cells(evmRow + 6, 2).Value = "Actual Cost for the work completion for the week"
+    TargetSht.Cells(evmRow + 6, 3).Value = SumOfAC
+    TargetSht.Cells(evmRow + 7, 2).Value = "CV"
+    TargetSht.Cells(evmRow + 7, 3).Value = SumOfEV - SumOfAC
+    TargetSht.Cells(evmRow + 8, 2).Value = "SV"
+    TargetSht.Cells(evmRow + 8, 3).Value = SumOfEV - SumOfHrs
+    TargetSht.Cells(evmRow + 9, 2).Value = "CPI"
+    If SumOfAC <> 0 Then
+        TargetSht.Cells(evmRow + 9, 3).Value = SumOfEV / SumOfAC
+    End If
+    TargetSht.Cells(evmRow + 10, 2).Value = "SPI"
+    If SumOfHrs <> 0 Then
+         TargetSht.Cells(evmRow + 10, 3).Value = SumOfEV / SumOfHrs
+    End If
+    TargetSht.Cells(evmRow + 11, 2).Value = "FTE Utilization for the week"
+    TargetSht.Cells(evmRow + 11, 3).Value = SumOfHrs / TotalFTE
+    Set tmpCell = Range("B" & evmRow + 3 & ":c" & evmRow + 11)
+    With tmpCell.Borders
+        .LineStyle = xlContinuous
+        .Color = vbBlack
+        .Weight = xlThin
+    End With
+    With tmpCell.Font
+        .Bold = True
+    End With
+End Sub
+
+Sub HoursTobeSpent()
+    loading = SourceSht.Cells(tmpCell.Row, 8).Value
+    TotalPlannedDays = TargetSht.Cells(evmRow, 4).Value - TargetSht.Cells(evmRow, 3).Value + 1
+    If (tmpCell.Value < WeekStart) Then
+        StartInThatWeek = WeekStart
+    Else
+        StartInThatWeek = tmpCell.Value
+    End If
+    If (WeekEnd < ActualFinishValue) Then
+        EndInThatWeek = WeekEnd
+    Else
+        EndInThatWeek = ActualFinishValue
+    End If
+    DaysInThatWeek = EndInThatWeek - StartInThatWeek + 1
+    If (TotalPlannedDays <> 0) Then
+        HrstoSpent = (TargetSht.Cells(evmRow, 6).Value * DaysInThatWeek * loading) / TotalPlannedDays
+    Else
+        HrstoSpent = 0
+    End If
+End Sub

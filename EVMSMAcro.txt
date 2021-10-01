@@ -1,0 +1,347 @@
+Dim SourceWB As Workbook, TargetWB As Workbook, ExpelFileName As String, FileName As String
+
+Dim SourceSht As Worksheet, TargetSht As Worksheet, ws As Worksheet, NamesKeySht As Worksheet, EstimateSht As Worksheet, PlanSht As Worksheet, sh As Worksheet
+
+Dim Stage As String, Month As Integer, i As Integer, NamesKeyLastRow As Integer
+
+Dim lastrow As Long, tmpCell As Range, PrevFun As String, evmrow As Integer, SourceCell As Range
+
+Dim Author As String, reviewer As String, Name As String, EstimateCell As Range
+
+ 
+
+ 
+
+Sub EVMS()
+
+    Set SourceWB = Application.Workbooks("XWB-6.1 EVMS DATA_Kiran.xlsm")
+
+    For Each ws In SourceWB.Worksheets
+
+        If ws.Name = "EVM" Or ws.Name = "EXPEL_DATABASE" Or ws.Name = "Estimates" Or ws.Name = "Sheet2" Or ws.Name = "Sheet1" Or ws.Name = "Names Key" Or ws.Name = "Plan" Then
+
+           Application.DisplayAlerts = False
+
+            ws.Delete
+
+            Application.DisplayAlerts = True
+
+        End If
+
+    Next
+
+    SourceWB.Worksheets.Add(, SourceWB.Worksheets(SourceWB.Worksheets.Count)).Name = "Sheet2"
+
+    SourceWB.Worksheets.Add(, SourceWB.Worksheets(SourceWB.Worksheets.Count)).Name = "Sheet1"
+
+    'MsgBox "Select Expel Data File"
+
+    ExpelFileName = "P:\trent_xwb\xwb_as\Users\Amrutha_MU\EXPEL_DATABASE_12072018.xlsx"
+
+    'Application.GetOpenFilename(Title:="Select Expel Data File to be opened")
+
+    Set TargetWB = Workbooks.Open(ExpelFileName)
+
+    FileName = Right(ExpelFileName, Len(ExpelFileName) - InStrRev(ExpelFileName, "\"))
+
+    If TargetWB.Sheets("EXPEL_DATABASE").AutoFilterMode Then TargetWB.Sheets("EXPEL_DATABASE").ShowAllData
+
+    Sheets("EXPEL_DATABASE").Select
+
+    Sheets("EXPEL_DATABASE").Copy Before:=SourceWB.Sheets(1)
+
+    Workbooks(FileName).Close SaveChanges:=False
+
+    Set SourceSht = SourceWB.Worksheets("EXPEL_DATABASE")
+
+    SourceWB.Worksheets.Add(, SourceWB.Worksheets(SourceWB.Worksheets.Count)).Name = "EVM"
+
+    Set TargetSht = SourceWB.Worksheets("EVM")
+
+    Call ExtractExpelData
+
+   
+
+    'MsgBox "Select Monitor Sheet File"
+
+    ExpelFileName = "P:\trent_xwb\xwb_as\Users\Amrutha_MU\XWB-6.0 Delivery Progress Chart Data.xlsm"
+
+    'Application.GetOpenFilename(Title:="Select Monitor Sheet File to be opened")
+
+    Set TargetWB = Workbooks.Open(ExpelFileName)
+
+    FileName = Right(ExpelFileName, Len(ExpelFileName) - InStrRev(ExpelFileName, "\"))
+
+    If TargetWB.Sheets("Estimates").AutoFilterMode Then TargetWB.Sheets("Estimates").ShowAllData
+
+    If TargetWB.Sheets("Names Key").AutoFilterMode Then TargetWB.Sheets("Names Key").ShowAllData
+
+    If TargetWB.Sheets("Plan").AutoFilterMode Then TargetWB.Sheets("Plan").ShowAllData
+
+    Application.DisplayAlerts = False
+
+    For Each sh In TargetWB.Sheets
+
+        If (sh.Name = "Estimates" Or sh.Name = "Names Key" Or sh.Name = "Plan") Then
+
+                sh.Copy after:=SourceWB.Sheets(SourceWB.Sheets.Count)
+
+        End If
+
+    Next
+
+ 
+
+    Workbooks(FileName).Close SaveChanges:=False
+
+    Application.DisplayAlerts = True
+
+    Set EstimateSht = SourceWB.Worksheets("Estimates")
+
+    Set NamesKeySht = SourceWB.Worksheets("Names Key")
+
+    Set PlanSht = SourceWB.Worksheets("Plan")
+
+    Call ExtractMonitorData
+
+    Call ExtractPlanData
+
+  
+
+    
+
+End Sub
+
+ 
+
+Sub ExtractExpelData()
+
+    'Call getStageAndMonth
+
+    Stage = "XWB 6.0"
+
+    lastrow = SourceSht.UsedRange.Row - 1 + SourceSht.UsedRange.Rows.Count
+
+    SourceSht.Range("A1").AutoFilter Field:=7, Criteria1:=Stage
+
+    SourceSht.AutoFilter.Sort.SortFields.Add Key:=Range("H2:H" & lastrow), SortOn:=xlSortOnValues, Order:=xlAscending
+
+    SourceSht.AutoFilter.Sort.Header = xlYes
+
+    SourceSht.AutoFilter.Sort.Apply
+
+    SourceSht.Range("A1:W" & lastrow).SpecialCells(xlCellTypeVisible).Copy
+
+    SourceWB.Sheets("Sheet2").Range("A1").PasteSpecial
+
+    Set SourceSht = SourceWB.Worksheets("Sheet2")
+
+    lastrow = SourceSht.UsedRange.Row - 1 + SourceSht.UsedRange.Rows.Count
+
+    Call CopyFromExpelToEVMS
+
+End Sub
+
+Sub ExtractMonitorData()
+
+    lastrow = EstimateSht.UsedRange.Row - 1 + EstimateSht.UsedRange.Rows.Count
+
+    'SourceSht.Columns("A:XFD").Sort key1:=Range("H:H"), order1:=xlAscending, Header:=xlYes
+
+    EstimateSht.Range("A1").AutoFilter Field:=7, Criteria1:="Y"
+
+    EstimateSht.AutoFilter.Sort.SortFields.Add Key:=Range("A3:A" & lastrow), SortOn:=xlSortOnValues, Order:=xlAscending
+
+    EstimateSht.AutoFilter.Sort.Header = xlYes
+
+    EstimateSht.AutoFilter.Sort.Apply
+
+    EstimateSht.Range("A1:BC" & lastrow).SpecialCells(xlCellTypeVisible).Copy
+
+    SourceWB.Sheets("Sheet1").Range("A1").PasteSpecial
+
+    Set EstimateSht = SourceWB.Worksheets("Sheet1")
+
+    lastrow = EstimateSht.UsedRange.Row - 1 + EstimateSht.UsedRange.Rows.Count
+
+End Sub
+
+Sub ExtractPlanData()
+
+    lastrow = PlanSht.UsedRange.Row - 1 + PlanSht.UsedRange.Rows.Count
+
+    'SourceSht.Columns("A:XFD").Sort key1:=Range("H:H"), order1:=xlAscending, Header:=xlYes
+
+    PlanSht.Range("A1").AutoFilter Field:=8, Criteria1:="Y"
+
+    PlanSht.AutoFilter.Sort.SortFields.Add Key:=Range("A3:A" & lastrow), SortOn:=xlSortOnValues, Order:=xlAscending
+
+    PlanSht.AutoFilter.Sort.Header = xlYes
+
+    PlanSht.AutoFilter.Sort.Apply
+
+    PlanSht.Range("A1:BC" & lastrow).SpecialCells(xlCellTypeVisible).Copy
+
+    SourceWB.Sheets("Sheet3").Range("A1").PasteSpecial
+
+    Set PlanSht = SourceWB.Worksheets("Sheet3")
+
+    lastrow = PlanSht.UsedRange.Row - 1 + PlanSht.UsedRange.Rows.Count
+
+    Call CopyFromMonitorToEVMS
+
+End Sub
+
+ 
+
+Sub CopyFromExpelToEVMS()
+
+    TargetSht.Cells(1, 1).Value = "Component"
+
+    TargetSht.Cells(1, 2).Value = "RRB Estimated Hours"
+
+    TargetSht.Cells(1, 3).Value = "Planned Progress"
+
+    TargetSht.Cells(1, 5).Value = "Actual Progress"
+
+    TargetSht.Cells(1, 6).Value = "Actual Cost(AC)"
+
+    TargetSht.Cells(1, 7).Value = "Planned Value(PV)"
+
+    TargetSht.Cells(1, 8).Value = "EV"
+
+    TargetSht.Cells(1, 9).Value = "SPI"
+
+    TargetSht.Cells(1, 10).Value = "CPI"
+
+    For Each tmpCell In TargetSht.Range("A1:J1")
+
+        tmpCell.Font.ColorIndex = 56
+
+        tmpCell.Font.Bold = True
+
+        tmpCell.Font.Size = 12
+
+        tmpCell.Font.Name = "Cambria"
+
+        tmpCell.Interior.ColorIndex = 35
+
+        tmpCell.WrapText = False
+
+        With tmpCell.Borders
+
+        .LineStyle = xlContinuous
+
+        .Color = vbBlack
+
+        .Weight = xlThin
+
+    End With
+
+    Next
+
+    PrevFun = ""
+
+    evmrow = 2
+
+    For Each tmpCell In SourceSht.Range("H2:H" & lastrow)
+
+       If tmpCell.Text <> PrevFun Then
+
+            evmrow = evmrow + 1
+
+            TargetSht.Cells(evmrow, 1).Value = SourceSht.Cells(tmpCell.Row, 8).Value
+
+            TargetSht.Cells(evmrow, 6).Value = SourceSht.Cells(tmpCell.Row, 17).Value
+
+            PrevFun = SourceSht.Cells(tmpCell.Row, 8).Text
+
+        Else
+
+            TargetSht.Cells(evmrow, 6).Value = TargetSht.Cells(evmrow, 6).Value + SourceSht.Cells(tmpCell.Row, 17).Value
+
+        End If
+
+    Next
+
+End Sub
+
+Sub CopyFromMonitorToEVMS()
+
+    MsgBox "Hello"
+
+   
+
+    lastrow = PlanSht.UsedRange.Row - 1 + PlanSht.UsedRange.Rows.Count
+
+    For Each tmpCell In TargetSht.Range("A3:A" & evmrow)
+
+    TargetSht.Cells(tmpCell.Row, 2).Value = 0
+
+    If Left(tmpCell.Text, 1) = "\" Then
+
+        tmpCell.Value = Right(tmpCell.Value, Len(tmpCell.Value) - 1)
+
+    End If
+
+        For Each SourceCell In PlanSht.Range("A6:A" & lastrow)
+
+            If (tmpCell.Text = SourceCell.Text) Then
+
+                For Each EstimateCell In EstimateSht.Range("A3:A" & EstimateSht.UsedRange.Row - 1 + EstimateSht.UsedRange.Rows.Count)
+
+                    If (tmpCell.Text = EstimateCell.Text) Then
+
+                        Author = Centre(PlanSht.Cells(SourceCell.Row, 59).Value)
+
+                        reviewer = Centre(PlanSht.Cells(SourceCell.Row, 60).Value)
+
+                        If (Author = "RRB") Then
+
+                            TargetSht.Cells(tmpCell.Row, 2).Value = TargetSht.Cells(tmpCell.Row, 2).Value + EstimateSht.Cells(EstimateCell.Row, 17).Value + EstimateSht.Cells(EstimateCell.Row, 18).Value + EstimateSht.Cells(EstimateCell.Row, 21).Value + EstimateSht.Cells(EstimateCell.Row, 22).Value + EstimateSht.Cells(EstimateCell.Row, 27).Value + EstimateSht.Cells(EstimateCell.Row, 28).Value + EstimateSht.Cells(EstimateCell.Row, 31).Value + EstimateSht.Cells(EstimateCell.Row, 32).Value + EstimateSht.Cells(EstimateCell.Row, 37).Value + EstimateSht.Cells(EstimateCell.Row, 38).Value + EstimateSht.Cells(EstimateCell.Row, 41).Value + EstimateSht.Cells(EstimateCell.Row, 42).Value
+
+                        End If
+
+                        If (reviewer = "RRB") Then
+
+                            TargetSht.Cells(tmpCell.Row, 2).Value = TargetSht.Cells(tmpCell.Row, 2).Value + EstimateSht.Cells(EstimateCell.Row, 19).Value + EstimateSht.Cells(EstimateCell.Row, 20).Value + EstimateSht.Cells(EstimateCell.Row, 23).Value + EstimateSht.Cells(EstimateCell.Row, 24).Value + EstimateSht.Cells(EstimateCell.Row, 29).Value + EstimateSht.Cells(EstimateCell.Row, 30).Value + EstimateSht.Cells(EstimateCell.Row, 33).Value + EstimateSht.Cells(EstimateCell.Row, 34).Value + EstimateSht.Cells(EstimateCell.Row, 39).Value + EstimateSht.Cells(EstimateCell.Row, 40).Value + EstimateSht.Cells(EstimateCell.Row, 44).Value + EstimateSht.Cells(EstimateCell.Row, 44).Value
+
+                        End If
+
+                    End If
+
+                Next
+
+            End If
+
+        Next
+
+         If (TargetSht.Cells(tmpCell.Row, 2).Value = "") Then
+
+            TargetSht.Cells(tmpCell.Row, 2).Interior.ColorIndex = 40
+
+         End If
+
+    Next
+
+   
+
+End Sub
+
+ 
+
+Private Function Centre(ByVal Name As String) As String
+
+    For Each SourceCell In PlanSht.Range("A4:A" & NamesKeySht.UsedRange.Row - 1 + NamesKeySht.UsedRange.Rows.Count)
+
+            If (Name = SourceCell.Text) Then
+
+            Name = NamesKeySht.Cells(SourceCell.Row, 3).Value
+
+            Centre = Name
+
+            End If
+
+    Next
+
+End Function

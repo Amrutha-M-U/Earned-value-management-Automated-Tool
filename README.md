@@ -1,2 +1,6 @@
 # Earned-value-management-Automated-Tool
-VBA based automated EVM calculation tool
+VBA based application to fetch details from
+project peformance excel sheet and calculate
+all values required forEVM calculation by a
+single mouse click.
+• Libraries Used: VBA
